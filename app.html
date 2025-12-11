@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>資生堂 SHISEIDO - AI 美妝顧問</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Microsoft YaHei', 'PingFang TC', sans-serif;
+            background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-bottom: 4px solid #dc2626;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #991b1b;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #6b7280;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 0 0 12px 12px;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0;
+            transition: margin-bottom 0.3s ease;
+        }
+
+        .chat-area.toggle-collapsed {
+            margin-bottom: -8px;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            margin-bottom: 12px;
+            background: #fafafa;
+            border-radius: 8px;
+            -webkit-overflow-scrolling: touch; /* 平滑滾動 for iOS */
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 16px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+        }
+
+        .message.user .message-content {
+            background: #dc2626;
+            color: white;
+        }
+
+        .message.assistant .message-content {
+            background: #f3f4f6;
+            color: #1f2937;
+        }
+
+        .loading {
+            display: flex;
+            gap: 8px;
+            padding: 16px;
+            background: #f3f4f6;
+            border-radius: 12px;
+            width: fit-content;
+        }
+
+        .loading-dot {
+            width: 8px;
+            height: 8px;
+            background: #9ca3af;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .quick-buttons {
+            margin-bottom: 8px;
+            transition: margin-bottom 0.3s ease;
+        }
+
+        .quick-buttons.collapsed {
+            margin-bottom: 8px;
+        }
+
+        .quick-buttons-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 12px;
+            background: #fef2f2;
+            border-radius: 8px;
+            transition: all 0.2s;
+            user-select: none;
+            margin-bottom: 0;
+        }
+
+        .quick-buttons-header:hover {
+            background: #fee2e2;
+        }
+
+        .quick-buttons-header p {
+            font-size: 14px;
+            color: #b91c1c;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .toggle-icon {
+            width: 20px;
+            height: 20px;
+            color: #b91c1c;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-icon.expanded {
+            transform: rotate(180deg);
+        }
+
+        .quick-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+            opacity: 0;
+        }
+
+        .quick-grid.expanded {
+            max-height: 500px;
+            opacity: 1;
+            margin-top: 10px;
+        }
+
+        .quick-btn {
+            background: #fef2f2;
+            color: #b91c1c;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .quick-btn:hover:not(:disabled) {
+            background: #fee2e2;
+            transform: translateY(-2px);
+        }
+
+        .quick-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .input-area input:focus {
+            border-color: #dc2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+        }
+
+        .input-area input:disabled {
+            background: #f9fafb;
+            opacity: 0.6;
+        }
+
+        .send-btn {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 16px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #b91c1c;
+            transform: translateY(-2px);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .action-panel {
+            width: 280px;
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .action-panel h3 {
+            color: #1f2937;
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .action-btn {
+            border: none;
+            color: white;
+            padding: 14px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .action-btn.gray {
+            background: #6b7280;
+        }
+
+        .action-btn.gray:hover {
+            background: #4b5563;
+        }
+
+        .action-btn.red {
+            background: #dc2626;
+        }
+
+        .action-btn.red:hover {
+            background: #b91c1c;
+        }
+
+        .info-box {
+            margin-top: 24px;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .info-box p {
+            font-size: 12px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .sparkle {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                height: calc(100vh - 20px);
+            }
+
+            .header {
+                padding: 20px 15px;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .header p {
+                font-size: 14px;
+            }
+
+            .main-content {
+                flex-direction: column;
+                padding: 15px;
+                gap: 8px;
+            }
+            
+            .messages {
+                padding: 15px;
+                margin-bottom: 10px;
+                max-height: 50vh;
+            }
+
+            .message-content {
+                max-width: 85%;
+                padding: 12px;
+                font-size: 14px;
+            }
+
+            .quick-buttons {
+                margin-bottom: 6px;
+            }
+
+            .quick-buttons.collapsed {
+                margin-bottom: 6px;
+            }
+
+            .quick-buttons-header {
+                padding: 10px;
+                margin-bottom: 0;
+            }
+
+            .quick-buttons-header p {
+                font-size: 13px;
+            }
+
+            .toggle-icon {
+                width: 18px;
+                height: 18px;
+            }
+
+            .quick-grid {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .quick-grid.expanded {
+                max-height: 800px;
+                margin-top: 8px;
+            }
+
+            .quick-btn {
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+
+            .input-area {
+                gap: 8px;
+            }
+
+            .input-area input {
+                padding: 12px;
+                font-size: 14px;
+            }
+
+            .send-btn {
+                padding: 12px 16px;
+                min-width: 50px;
+            }
+
+            .send-btn svg {
+                width: 18px;
+                height: 18px;
+            }
+            
+            .action-panel {
+                width: 100%;
+                padding: 15px;
+            }
+
+            .action-panel h3 {
+                font-size: 16px;
+                margin-bottom: 12px;
+            }
+
+            .action-buttons {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .action-btn {
+                padding: 14px 12px;
+                font-size: 14px;
+                text-align: center;
+            }
+
+            .info-box {
+                margin-top: 15px;
+                padding: 12px;
+            }
+
+            .info-box p {
+                font-size: 11px;
+            }
+        }
+
+        /* 針對小螢幕手機 (iPhone SE 等) */
+        @media (max-width: 375px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .messages {
+                max-height: 45vh;
+            }
+
+            .message-content {
+                max-width: 90%;
+                padding: 10px;
+                font-size: 13px;
+            }
+
+            .quick-btn {
+                font-size: 12px;
+            }
+
+            .action-btn {
+                font-size: 13px;
+                padding: 12px 10px;
+            }
+        }
+
+        /* --- 新增的 Markdown 樣式 --- */
+        .message.assistant .message-content p {
+            margin-bottom: 0.8em; /* 段落間距 */
+        }
+        .message.assistant .message-content p:last-child {
+            margin-bottom: 0;
+        }
+        .message.assistant .message-content strong {
+            color: #b91c1c; /* 資生堂紅，讓重點更明顯 */
+            font-weight: 700;
+        }
+        .message.assistant .message-content ul, 
+        .message.assistant .message-content ol {
+            margin-left: 20px; /* 列表縮排 */
+            margin-bottom: 0.8em;
+        }
+        .message.assistant .message-content li {
+            margin-bottom: 0.4em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>資生堂 SHISEIDO</h1>
+            <p>
+                <span class="sparkle">✨</span>
+                AI 美妝顧問
+            </p>
+        </div>
+
+        <div class="main-content">
+            <div class="chat-area toggle-collapsed">
+                <div class="messages" id="messages">
+                    <div class="message assistant">
+                        <div class="message-content">
+                            歡迎來到資生堂怡麗絲爾 😊<br>為了幫你快速找到最適合的保養，想先請問您是第一次接觸怡麗絲爾，還是我們的老朋友呢？
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-buttons collapsed">
+                    <div class="quick-buttons-header" onclick="toggleQuickButtons()">
+                        <p>快速提問 💬</p>
+                        <svg class="toggle-icon" id="toggleIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                    <div class="quick-grid" id="quickGrid">
+                        <button class="quick-btn" onclick="sendQuickMessage('你們的暢銷商品是什麼？')">你們的暢銷商品是什麼？</button>
+                        <button class="quick-btn" onclick="sendQuickMessage('多效美肌乳的主要功效有哪些？')">多效美肌乳的主要功效有哪些？</button>
+                        <button class="quick-btn" onclick="sendQuickMessage('膠原緊V澎潤霜的成分是什麼？')">膠原緊V澎潤霜的成分是什麼？</button>
+                        <button class="quick-btn" onclick="sendQuickMessage('膠原A醇超導抗皺精華適合什麼人使用？')">膠原A醇超導抗皺精華適合什麼人使用？</button>
+                        <button class="quick-btn" onclick="sendQuickMessage('膠原新肌光速精華乳有什麼特別技術？')">膠原新肌光速精華乳有什麼特別技術？</button>
+                    </div>
+                </div>
+
+                <div class="input-area">
+                    <input 
+                        type="text" 
+                        id="userInput" 
+                        placeholder="詢問任何關於資生堂產品的問題..."
+                        onkeypress="handleKeyPress(event)"
+                    >
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="action-panel">
+                <h3>購買決定</h3>
+                <div class="action-buttons">
+                    <button class="action-btn red" onclick="handleAction('我要購買')">我要購買</button>
+                    <button class="action-btn gray" onclick="handleAction('我再考慮看看')">我再考慮看看</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ 請將下方的 API Key 替換為您自己的 Google Gemini API Key
+        let API_KEY = localStorage.getItem("GEMINI_API_KEY");
+
+        // 若沒有 key → 導回登入頁
+        if (!API_KEY) {
+            alert("請先輸入 API Key");
+            window.location.href = "index.html";
+        }
+
+        const systemPrompt = `
+你是一位資生堂 SHISEIDO｜怡麗絲爾 ELIXIR 的專業銷售顧問。你的任務是以「問題引導式銷售（Question-led Sales）」方式與顧客互動，打造自然、精準、貼心的購物體驗。你可以「參考」提供的對話流程 JSON（EI-AI銷售員-對話流程.json），將其中的節點邏輯、分流方式、賣點順序、產品關聯性、銷售動線等作為你的對話架構參考來源，但不需要逐字照抄或硬性遵守。JSON 用來協助你理解：如何分流新客／舊客、提問順序、產品銜接與行動呼籲方式。
+
+EI-AI銷售員-對話流程.json:
+{
+  "dialogue_knowledge_base": {
+    "constraints_summary": {
+      "total_sentences_min": 60,
+      "n_flow_steps_min": 20,
+      "n_flow_serum_pitch": "6 consecutive selling points (N05-N09)",
+      "o_flow_combo_pitch": "3 products, 4 sentences per product (Total 12 sentences)",
+      "product_focus": "ELIXIR V Cream, Serum, Day Care Milk"
+    },
+    "flows": [
+      {
+        "step_id": "S00_Start",
+        "category": "全流程",
+        "condition": "(啟動)",
+        "ai_output": "歡迎來到資生堂怡麗絲爾。我是您的膠原蛋白專家。",
+        "next_state": "S01_分流"
+      },
+      {
+        "step_id": "S01_分流",
+        "category": "全流程",
+        "condition": "客戶類型：新客",
+        "ai_output": "想更快找到適合您的保養嗎？我在這裡陪您一起找最適合的方式。今天您比較想改善哪一部分呢？",
+        "next_state": "N01_需求分類"
+      },
+      {
+        "step_id": "S01_分流",
+        "category": "全流程",
+        "condition": "客戶類型：舊客",
+        "ai_output": "歡迎回來。我將為您進行一個快速的升級建議，讓您現有保養更貼近現況。請問您這次比較想改善哪一部分呢？",
+        "next_state": "O01_目的"
+      },
+      {
+        "step_id": "N01_需求分類",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "是追求 **透亮光澤感**（美肌乳最擅長），還是加強 **年輕線條與彈力**（精華／V霜都有效）呢？",
+        "next_state": "N02_需求確認"
+      },
+      {
+        "step_id": "N02_需求確認",
+        "category": "新客 (25-30歲)",
+        "condition": "顧客回答：年輕線條與彈力",
+        "ai_output": "好的～想加強彈力和線條。那這三個小分類您最想先處理哪一個？是 **臉部輪廓緊實**、**眼周細紋疲態**，還是 **法令紋／初老紋路** 呢？",
+        "next_state": "N03_細分確認"
+      },
+      {
+        "step_id": "N03_細分確認",
+        "category": "新客 (25-30歲)",
+        "condition": "顧客回答：臉部輪廓緊實",
+        "ai_output": "了解，鎖定 **輪廓緊實** 這個需求很常見。那您平常比較喜歡 **清爽快吸收**（精華類），還是 **豐潤包覆感**（乳霜）的質地呢？",
+        "next_state": "N04_質地確認"
+      },
+      {
+        "step_id": "N04_質地確認",
+        "category": "新客 (25-30歲)",
+        "condition": "顧客回答：清爽快吸收",
+        "ai_output": "好的，偏好清爽快吸收。我們為您整理了最優化您訴求的組合：**膠原新肌光速精華** 與 **膠原緊V澎潤霜** 的夜間雙鎖組。",
+        "next_state": "N05_賣點1"
+      },
+      {
+        "step_id": "N05_賣點1",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "我們從核心的 **光速精華** 開始。這是它的第一點：它運用 **「超導光速科技」**，是您 **日常彈力修護的核心**。",
+        "next_state": "N06_賣點2"
+      },
+      {
+        "step_id": "N06_賣點2",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "第二點：它能讓肌膚在 **15 分鐘內有感緊、潤、亮**，讓您立即感受到膚況提升。",
+        "next_state": "N06_A_賣點3"
+      },
+      {
+        "step_id": "N06_A_賣點3",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "第三點：這款精華能有效預防微細結構的鬆弛，是您這個年齡層 **防止初老細紋出現** 的最關鍵投資。",
+        "next_state": "N07_賣點4"
+      },
+      {
+        "step_id": "N07_賣點4",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "第四點：精華中含有珍貴的 **「時控修護複合精華」**，能從源頭穩定膠原蛋白的生成環境，讓彈力更有韌性。",
+        "next_state": "N08_賣點5"
+      },
+      {
+        "step_id": "N08_賣點5",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "第五點：雖然抗老力強，但 **質地清爽但保水感強**，適合需要日常打底、穩定膚況的您。",
+        "next_state": "N09_賣點6"
+      },
+      {
+        "step_id": "N09_賣點6",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "第六點：建議在夜間保養的第一步使用，它能促進玻尿酸產生，為您後續的 V 霜吸收打下最好的基礎。",
+        "next_state": "N10_V霜銜接"
+      },
+      {
+        "step_id": "N10_V霜銜接",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "接下來是豐潤包覆感的代表：**膠原緊V澎潤霜**。這是您最需要的 **V型支撐力**。",
+        "next_state": "N11_V霜科技"
+      },
+      {
+        "step_id": "N11_V霜科技",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "V 霜運用了獨家 **V型無重力科技**，效果宛如「同時打電波+玻尿酸」，能為您提供長效的 **V型支撐力**。",
+        "next_state": "N12_V霜功效"
+      },
+      {
+        "step_id": "N12_V霜功效",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "它是業界唯一同時賦活 **5 大關鍵膠原蛋白** 的產品，專注於輪廓提拉，讓您一覺醒來就能感受線條上揚。",
+        "next_state": "N12_A_V霜優勢"
+      },
+      {
+        "step_id": "N12_A_V霜優勢",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "雖然是乳霜，但它能將精華的營養緊緊鎖住，為肌膚地基提供最強的支撐力。",
+        "next_state": "N13_V霜質地"
+      },
+      {
+        "step_id": "N13_V霜質地",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "V 霜的設計是 **豐潤而不黏膩**，確保您在台灣也能舒適地完成深層的夜間保養。",
+        "next_state": "N14_日夜完整"
+      },
+      {
+        "step_id": "N14_日夜完整",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "這個夜間雙鎖組能完成您的最高規格修護。現在我們加入日間防護：**膠原彈潤多效美肌乳（小金管）**。",
+        "next_state": "N15_日霜介紹"
+      },
+      {
+        "step_id": "N15_日霜介紹",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "小金管是 **乳液、防曬 SPF50+、妝前乳三效合一** 的日間革命性產品，是 **營造每日「素顏光」** 的代表。",
+        "next_state": "N16_日霜防護"
+      },
+      {
+        "step_id": "N16_日霜防護",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "它的 **膠原修護因子** 能像一層水潤防禦膜，有效阻擋光老化對您膠原蛋白的傷害。",
+        "next_state": "N16_A_日霜效益"
+      },
+      {
+        "step_id": "N16_A_日霜效益",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "這能確保您夜間的修護成果不會被日間環境損耗，讓肌膚維持在水玉光的最佳狀態。",
+        "next_state": "N17_日霜方便"
+      },
+      {
+        "step_id": "N17_日霜方便",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "早上只要一瓶就能完成所有防護，讓您快速出門，同時讓妝感更服貼、看起來更精神。",
+        "next_state": "N18_總結"
+      },
+      {
+        "step_id": "N18_總結",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "**總結：** 這個「美肌乳、精華液、V澎潤霜」的組合，將為您的年輕肌膚提供最完整、無死角的抗老修護方案。",
+        "next_state": "N19_行動呼籲"
+      },
+      {
+        "step_id": "N19_行動呼籲",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "我們目前有針對此三步驟組合的 **新客入門優惠價**。請問是否直接為您準備這套完整的膠原抗老方案呢？",
+        "next_state": "N20_細節詢問"
+      },
+      {
+        "step_id": "N20_細節詢問",
+        "category": "新客 (25-30歲)",
+        "condition": "顧客回答：想了解更多",
+        "ai_output": "沒問題。請問您對 **V 霜的質地** 還有疑慮，還是想確認 **三款產品的使用順序** 呢？",
+        "next_state": "N21_流程確認"
+      },
+      {
+        "step_id": "N21_流程確認",
+        "category": "新客 (25-30歲)",
+        "condition": "(系統銜接)",
+        "ai_output": "我會口頭為您詳述這三款產品的功效差異和使用順序，確保您購買後能夠正確使用。",
+        "next_state": "N99_確認"
+      },
+      {
+        "step_id": "O01_目的",
+        "category": "舊客 (全齡)",
+        "condition": "顧客回答：(任意)",
+        "ai_output": "歡迎回來。我將為您進行一個快速的升級建議。我建議您將保養升級為 **怡麗絲爾膠原蛋白金三角**，讓您現有的保養效益最大化。",
+        "next_state": "O02_組合開場"
+      },
+      {
+        "step_id": "O02_組合開場",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "這個金三角包含 **膠原新肌光速精華、膠原緊V澎潤霜，以及膠原彈潤多效美肌乳**。我將為您說明這三件產品的協同作用。",
+        "next_state": "O03_V霜1"
+      },
+      {
+        "step_id": "O03_V霜1",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "**【膠原緊V澎潤霜】** V霜是這套組合的核心修護力。它運用了獨家 **V型無重力科技**，能為您的肌膚提供 **持續且穩定的緊緻拉提力**。",
+        "next_state": "O04_V霜2"
+      },
+      {
+        "step_id": "O04_V霜2",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "V 霜是業界唯一同時賦活 **5 大關鍵膠原蛋白** 的產品，直擊最深層的鬆弛問題。",
+        "next_state": "O05_V霜3"
+      },
+      {
+        "step_id": "O05_V霜3",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "建議搭配精華在夜間使用，它能將養分緊緊鎖住，讓您在睡眠中持續收緊輪廓。",
+        "next_state": "O06_V霜4"
+      },
+      {
+        "step_id": "O06_V霜4",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "它的豐潤包覆感，能完美鎖住精華，是您維持年輕線條最划算的夜間投資。",
+        "next_state": "O07_精華1"
+      },
+      {
+        "step_id": "O07_精華1",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "**【膠原新肌光速精華】** 光速精華是提升 V 霜效果的加速器。它具備獨家 **15 分鐘光速有感** 科技，是日常彈力修護核心。",
+        "next_state": "O08_精華2"
+      },
+      {
+        "step_id": "O08_精華2",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "作為前導，它能讓 V 霜的有效成分 **吸收得更快、更深**，讓您的夜間抗老效果加倍。",
+        "next_state": "O09_精華3"
+      },
+      {
+        "step_id": "O09_精華3",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "它能讓您持續維持穩定的 **水玉光**，是日常打底、穩定膚況最重要的一步。",
+        "next_state": "O10_精華4"
+      },
+      {
+        "step_id": "O10_精華4",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "它的清爽質地，即使連續使用，也能讓肌膚毫無負擔地完成深層修護。",
+        "next_state": "O11_美肌乳1"
+      },
+      {
+        "step_id": "O11_美肌乳1",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "**【膠原彈潤多效美肌乳】** 白天搭配小金管，是您最不能忽略的防護層。它能為您的肌膚提供 **最高規格的抗光老化防護**。",
+        "next_state": "O12_美肌乳2"
+      },
+      {
+        "step_id": "O12_美肌乳2",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "小金管是 **乳液、防曬、妝前乳三效合一**，能確保您的夜間修護成果不會被日間環境損耗。",
+        "next_state": "O13_美肌乳3"
+      },
+      {
+        "step_id": "O13_美肌乳3",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "它的輕盈質地能持續釋放膠原蛋白保濕，讓您的妝容更服貼，**讓水玉光從底妝透出來**。",
+        "next_state": "O14_美肌乳4"
+      },
+      {
+        "step_id": "O14_美肌乳4",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "這就是您維持水玉光，對抗日間傷害最簡單、最有效率的入門保養法。",
+        "next_state": "O15_總結"
+      },
+      {
+        "step_id": "O15_總結",
+        "category": "舊客 (全齡)",
+        "condition": "(系統銜接)",
+        "ai_output": "結論： 這套金三角組合，將為您的肌膚提供最完美、無死角的 **澎潤與緊緻修護**。請問是否為您準備結帳？",
+        "next_state": "O99_確認"
+      },
+      {
+        "step_id": "N99_確認",
+        "category": "新客 (全齡)",
+        "condition": "顧客回答：沒問題/確認",
+        "ai_output": "很高興為您找到最適合的組合。請問是直接為您準備這套 **[Nxx 組合名稱]** 嗎？",
+        "next_state": "S99_結尾"
+      },
+      {
+        "step_id": "O99_確認",
+        "category": "舊客 (全齡)",
+        "condition": "顧客回答：沒問題/確認",
+        "ai_output": "好的。我已為您整理好 **[Oxx 組合名稱]** 的清單。請問您是否還需要加購其他產品？",
+        "next_state": "S99_結尾"
+      },
+      {
+        "step_id": "S99_結尾",
+        "category": "全流程",
+        "condition": "(系統結束)",
+        "ai_output": "謝謝您的選擇。我們已經為您準備好產品，祝您擁有充滿水玉光的一天！",
+        "next_state": "STOP"
+      }
+    ]
+  }
+}
+
+【核心規則】
+1. 採用問題引導式銷售：透過提問 → 了解需求 → 推薦 → 再用提問收尾。
+2. 只推薦以下產品資訊提到的產品。
+3. 如果使用者詢問品牌或產品相關問題，請明確、完整回答後並引導回銷售流程。
+4. 使用繁體中文，語氣親切、專業、簡潔、友善，適度使用 emoji。
+5. 每段輸出不超過 2–3 句話，並以一個問題結尾，等待使用者回覆。
+6. 推薦時避免一次講太多，讓顧客透過回答逐步被引導。
+7. 銷售結尾可自然引導行動，例如：「需要我幫你準備這套組合嗎？」、「要不要比較兩款給你看？」
+8. **當察覺到使用者有明確購買意圖時**（例如：表示想購買、詢問價格、詢問如何結帳、表示要下單等），請立即告知：「太好了！為了給您最完善的服務，我們會幫您轉接到真人銷售員，他會協助您完成購買流程 😊」
+9. **絕對不要在回覆中包含任何內部思考過程、推理步驟、或用括號/引號標註的思緒內容。只輸出直接面對顧客的對話內容。**
+
+【注意事項】
+1. 不要重複之前出現過的銷售話術或提問。
+2. 回覆必須是自然的對話，不要出現「思緒：」、「回答內容：」、「我在思考...」、「根據分析...」、「(思考)」等內部推理過程。
+
+【品牌背景（可適度引用）】
+怡麗絲爾擁有 40 年膠原蛋白研究。五大膠原蛋白（1/3/4/5/7）能幫助提升肌膚的緊實、彈性、韌性。品牌理念包含：保護基底膜、強化肌膚框架、促進膠原再生與細胞能量。這些資訊可在推薦時簡短引用。
+
+【產品資訊（只能推薦這些產品）】
+1. 多效美肌乳：以抗光老化、防曬、妝前乳三效合一為主。膠原修復因子與微米級防曬技術。常見提問：你早上希望一瓶完成保養＋防曬嗎？
+2. 膠原緊V澎潤霜：改善鬆弛、凹陷與臉部輪廓框架。使用 V 型無重力技術與五大膠原蛋白。提問例：你會想改善臉部線條或下半臉緊實度嗎？
+3. 膠原A醇超導抗皺精華：改善細紋、粗糙與角質堆積。適用唇周、法令與抬頭紋。提問例：你的細紋多集中在哪裡呢？
+4. 膠原新肌光速精華乳：15 分鐘有感亮度與彈力。光速科技乳化與新肌酮提升滲透。提問例：你喜歡保養能快速看到效果嗎？
+
+【你的目標】
+以自然、貼心、流暢的方式透過提問引導使用者，並結合產品知識與 JSON 提供的流程框架，打造一個像真人櫃姐般的溫暖銷售體驗。
+        `;
+
+        let conversationHistory = [
+            {
+                role: 'assistant',
+                content: '歡迎來到資生堂怡麗絲爾 😊\n為了幫你快速找到最適合的保養，想先請問您是第一次接觸怡麗絲爾，還是我們的老朋友呢？'
+            }
+        ];
+        let isLoading = false;
+
+        // function addMessage(role, content) {
+        //     const messagesDiv = document.getElementById('messages');
+        //     const messageDiv = document.createElement('div');
+        //     messageDiv.className = `message ${role}`;
+            
+        //     const contentDiv = document.createElement('div');
+        //     contentDiv.className = 'message-content';
+        //     contentDiv.textContent = content;
+            
+        //     messageDiv.appendChild(contentDiv);
+        //     messagesDiv.appendChild(messageDiv);
+        //     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        //     conversationHistory.push({ role, content });
+        // }
+        function addMessage(role, content) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            // --- 修改開始 ---
+            if (role === 'assistant') {
+                // 如果是 AI 回覆，使用 marked 解析 Markdown 並放入 innerHTML
+                // 這裡的 parse 會把 **文字** 轉成 <strong>文字</strong>
+                contentDiv.innerHTML = marked.parse(content);
+            } else {
+                // 如果是使用者，保持純文字，避免 HTML 注入攻擊
+                contentDiv.textContent = content;
+            }
+            // --- 修改結束 ---
+            
+            messageDiv.appendChild(contentDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // 注意：存入歷史紀錄時，還是要存原始的 content (純文字)，不要存轉過的 HTML
+            conversationHistory.push({ role, content });
+        }
+
+        function showLoading() {
+            const messagesDiv = document.getElementById('messages');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loading';
+            loadingDiv.className = 'message assistant';
+            loadingDiv.innerHTML = `
+                <div class="loading">
+                    <div class="loading-dot"></div>
+                    <div class="loading-dot"></div>
+                    <div class="loading-dot"></div>
+                </div>
+            `;
+            messagesDiv.appendChild(loadingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function hideLoading() {
+            const loadingDiv = document.getElementById('loading');
+            if (loadingDiv) {
+                loadingDiv.remove();
+            }
+        }
+
+        function setInputEnabled(enabled) {
+            document.getElementById('userInput').disabled = !enabled;
+            document.getElementById('sendBtn').disabled = !enabled;
+            document.querySelectorAll('.quick-btn').forEach(btn => {
+                btn.disabled = !enabled;
+            });
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+            
+            if (!message || isLoading) return;
+
+            if (API_KEY === 'YOUR_GOOGLE_GEMINI_API_KEY_HERE') {
+                alert('請先在程式碼中設定您的 Google Gemini API Key！');
+                return;
+            }
+
+            isLoading = true;
+            setInputEnabled(false);
+            
+            addMessage('user', message);
+            input.value = '';
+            
+            showLoading();
+
+            try {
+                const messages = [
+                    {
+                        role: 'user',
+                        parts: [{ text: systemPrompt }]
+                    },
+                    ...conversationHistory.map(msg => ({
+                        role: msg.role === 'assistant' ? 'model' : 'user',
+                        parts: [{ text: msg.content }]
+                    }))
+                ];
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: messages,
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 8791,
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    // Log the full error to the console for debugging
+                    console.error('API HTTP Error:', response.status, errorData);
+                    // Throw a specific error for the catch block to handle
+                    throw new Error(`API HTTP Error ${response.status}: ${errorData.error.message || 'Unknown server error.'}`);
+                }
+
+                const data = await response.json();
+                hideLoading();
+                console.log('API Response:', data);
+
+                if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+                    addMessage('assistant', data.candidates[0].content.parts[0].text);
+                } else {
+                    throw new Error('Invalid response');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                hideLoading();
+                addMessage('assistant', '抱歉，我遇到了一些問題。請稍後再試。');
+            } finally {
+                isLoading = false;
+                setInputEnabled(true);
+                input.focus();
+            }
+        }
+
+        function sendQuickMessage(message) {
+            document.getElementById('userInput').value = message;
+            sendMessage();
+            
+            // 自動收合 toggle list
+            const quickGrid = document.getElementById('quickGrid');
+            const toggleIcon = document.getElementById('toggleIcon');
+            const quickButtons = document.querySelector('.quick-buttons');
+            const chatArea = document.querySelector('.chat-area');
+            
+            quickGrid.classList.remove('expanded');
+            toggleIcon.classList.remove('expanded');
+            quickButtons.classList.add('collapsed');
+            chatArea.classList.add('toggle-collapsed');
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function handleAction(action) {
+            alert(`感謝您！${action}`);
+        }
+
+        function toggleQuickButtons() {
+            const quickGrid = document.getElementById('quickGrid');
+            const toggleIcon = document.getElementById('toggleIcon');
+            const quickButtons = document.querySelector('.quick-buttons');
+            const chatArea = document.querySelector('.chat-area');
+            
+            quickGrid.classList.toggle('expanded');
+            toggleIcon.classList.toggle('expanded');
+            
+            // 管理收合狀態的間距
+            if (quickGrid.classList.contains('expanded')) {
+                quickButtons.classList.remove('collapsed');
+                chatArea.classList.remove('toggle-collapsed');
+            } else {
+                quickButtons.classList.add('collapsed');
+                chatArea.classList.add('toggle-collapsed');
+            }
+        }
+
+        // 初始化時聚焦輸入框
+        document.getElementById('userInput').focus();
+    </script>
+</body>
+</html>
